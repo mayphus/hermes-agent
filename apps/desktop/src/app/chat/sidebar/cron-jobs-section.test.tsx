@@ -154,3 +154,22 @@ describe('SidebarCronJobsSection run peek — zombie cron runs (#88443)', () => 
     expect(isStoredTranscriptReadOnly(output.id)).toBe(false)
   })
 })
+
+describe('SidebarCronJobsSection heading', () => {
+  it('leads the heading with a clock chip so the label lines up with platform sections', () => {
+    render(
+      <SidebarCronJobsSection
+        jobs={[job]}
+        label="Cron Jobs"
+        onManageJob={vi.fn()}
+        onOpenRun={vi.fn()}
+        onToggle={vi.fn()}
+        onTriggerJob={vi.fn()}
+        open={false}
+      />
+    )
+
+    const heading = screen.getByRole('button', { name: 'Cron Jobs' })
+    expect(heading.querySelector('svg')).not.toBeNull()
+  })
+})

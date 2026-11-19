@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { usePaneVisible } from '@/components/pane-shell/pane-visibility'
 import { ActionsContextMenu, type MenuKit, renderActionItem } from '@/components/ui/actions-menu'
+import { AvatarChip, type AvatarChipBrand } from '@/components/ui/avatar-chip'
 import { Codicon } from '@/components/ui/codicon'
 import { DisclosureCaret } from '@/components/ui/disclosure-caret'
 import { GlyphSpinner } from '@/components/ui/glyph-spinner'
@@ -11,6 +12,7 @@ import { SidebarGroup, SidebarGroupContent } from '@/components/ui/sidebar'
 import { Tip } from '@/components/ui/tooltip'
 import { deleteCronJob, getCronJobRuns, pauseCronJob, resumeCronJob, type SessionInfo } from '@/hermes'
 import { useI18n } from '@/i18n'
+import { Clock } from '@/lib/icons'
 import { fmtDayTime, relativeTime } from '@/lib/time'
 import { cn } from '@/lib/utils'
 import { confirm } from '@/store/confirm'
@@ -26,6 +28,10 @@ import { SidebarPanelLabel } from '../../shell/sidebar-label'
 
 import { SidebarRowBody, SidebarRowLabel, SidebarRowLead, SidebarRowShell } from './chrome'
 import { SidebarLoadMoreRow } from './load-more-row'
+
+// Same chip the messaging platform sections lead with, so the Cron jobs label
+// lines up with Telegram, Home Assistant and the plugin platforms above it.
+const CRON_SECTION_ICON: AvatarChipBrand = { Icon: Clock, color: '#64748B' }
 
 const INACTIVE_STATES = new Set(['completed', 'disabled', 'error', 'paused'])
 
@@ -182,12 +188,18 @@ export function SidebarCronJobsSection({
 
   return (
     <SidebarGroup className="shrink-0 p-0 pb-1">
-      <div className="group/section flex shrink-0 items-center justify-between pb-1 pt-1.5">
+      <div className="group/section flex shrink-0 items-center justify-between gap-1 pb-1 pt-1.5">
         <button
           className="group/section-label flex w-fit min-w-0 items-center gap-1 bg-transparent text-left leading-none"
           onClick={onToggle}
           type="button"
         >
+          <AvatarChip
+            aria-hidden="true"
+            brand={CRON_SECTION_ICON}
+            className="size-4 rounded-[4px] text-[0.5625rem] [&_svg]:size-3"
+            name={label}
+          />
           <SidebarPanelLabel>{label}</SidebarPanelLabel>
           <DisclosureCaret
             className="text-(--ui-text-tertiary) opacity-0 transition group-hover/section-label:opacity-100"
