@@ -609,11 +609,14 @@ export function useSessionListActions({ profileScope }: UseSessionListActionsArg
     let cancelled = false
     let retryTimer: ReturnType<typeof setTimeout> | undefined
     const sessionProfile = sidebarFetchProfile(profileScope)
+    // The unified view ('all') is not a real profile; the catalog route needs one,
+    // so fall back to the ambient request profile there.
+    const catalogProfile = sessionProfile === 'all' ? undefined : sessionProfile
 
     const load = (attempt: number) => {
       // Deferred so a synchronous throw (no desktop bridge yet) lands in .catch.
       Promise.resolve()
-        .then(() => getMessagingPlatforms(sessionProfile))
+        .then(() => getMessagingPlatforms(catalogProfile))
         .then(result => {
           if (cancelled || sidebarFetchProfile(profileScopeRef.current) !== sessionProfile) {
             return
