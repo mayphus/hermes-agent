@@ -1,12 +1,20 @@
+import { useStore } from '@nanostores/react'
 import { useCallback, useEffect, useLayoutEffect, useRef } from 'react'
 
-import { getApiRequestConnection, listAllProfileSessions, listSidebarSessions, type SessionInfo } from '@/hermes'
+import {
+  getApiRequestConnection,
+  getMessagingPlatforms,
+  listAllProfileSessions,
+  listSidebarSessions,
+  type SessionInfo
+} from '@/hermes'
 import { sameCronSignature } from '@/lib/session-signatures'
 import {
   isMessagingSource,
   LOCAL_SESSION_SOURCE_IDS,
-  MESSAGING_SESSION_SOURCE_IDS,
-  normalizeSessionSource
+  messagingSessionSourceIds,
+  normalizeSessionSource,
+  setRegisteredMessagingPlatforms
 } from '@/lib/session-source'
 import { gatewayActivationEpoch } from '@/store/gateway'
 import {
@@ -18,6 +26,7 @@ import {
   SIDEBAR_FILTERED_PAGE_SIZE,
   SIDEBAR_SESSIONS_PAGE_SIZE
 } from '@/store/layout'
+import { $platformsChangeTick } from '@/store/live-sync'
 import { messagingTotalsKey, normalizeProfileKey, sidebarProfileForScope } from '@/store/profile'
 import {
   $messagingSessions,
@@ -71,14 +80,17 @@ import {
 // conversations: every editor wake mints an auto-titled row, so they would
 // bury local chats — and they were never ended before #118216, which also
 // kept prune/archive away from them.
-const SIDEBAR_EXCLUDED_SOURCES = [
+//
+// Messaging sources include plugin-registered platforms the backend reports,
+// so this is evaluated per fetch rather than frozen at module load.
+const sidebarExcludedSources = () => [
   'acp',
   'cron',
   'kanban',
   'oneshot',
   'subagent',
   'tool',
-  ...MESSAGING_SESSION_SOURCE_IDS
+  ...messagingSessionSourceIds()
 ]
 
 // The messaging slice is the inverse: drop cron + every local source so only
@@ -400,7 +412,7 @@ export function useSessionListActions({ profileScope }: UseSessionListActionsArg
           listSidebarSessions({
             recentsProfile: sessionProfile,
             recentsLimit: limit,
-            recentsExclude: SIDEBAR_EXCLUDED_SOURCES,
+            recentsExclude: sidebarExcludedSources(),
             cronLimit: CRON_SECTION_LIMIT,
             messagingLimit: MESSAGING_SECTION_LIMIT,
             messagingExclude: MESSAGING_EXCLUDED_SOURCES
@@ -585,6 +597,53 @@ export function useSessionListActions({ profileScope }: UseSessionListActionsArg
       }),
     [refreshSessions]
   )
+
+  // Learn the backend's registered messaging platforms (built-ins AND plugin
+  // platforms) so every one of them gets its own sidebar section instead of
+  // only the hardcoded list. Re-read on scope switches and platforms.changed;
+  // when the set of ids moves, re-fetch both slices so rows migrate between
+  // recents and their platform section.
+  const platformsChangeTick = useStore($platformsChangeTick)
+
+  useEffect(() => {
+    let cancelled = false
+    let retryTimer: ReturnType<typeof setTimeout> | undefined
+    const sessionProfile = sidebarFetchProfile(profileScope)
+    // The unified view ('all') is not a real profile; the catalog route needs one,
+    // so fall back to the ambient request profile there.
+    const catalogProfile = sessionProfile === 'all' ? undefined : sessionProfile
+
+    const load = (attempt: number) => {
+      // Deferred so a synchronous throw (no desktop bridge yet) lands in .catch.
+      Promise.resolve()
+        .then(() => getMessagingPlatforms(catalogProfile))
+        .then(result => {
+          if (cancelled || sidebarFetchProfile(profileScopeRef.current) !== sessionProfile) {
+            return
+          }
+
+          if (setRegisteredMessagingPlatforms(result.platforms ?? [])) {
+            void refreshSessions()
+            void refreshMessagingSessions()
+          }
+        })
+        .catch(() => {
+          // Backend not up yet (boot, reconnect): retry a few times, then wait
+          // for the next platforms.changed / scope switch. The hardcoded list
+          // and the cached catalog keep working meanwhile.
+          if (!cancelled && attempt < 5) {
+            retryTimer = setTimeout(() => load(attempt + 1), 2000 * (attempt + 1))
+          }
+        })
+    }
+
+    load(0)
+
+    return () => {
+      cancelled = true
+      clearTimeout(retryTimer)
+    }
+  }, [profileScope, platformsChangeTick, refreshMessagingSessions, refreshSessions])
 
   // A Bot Mode switch moves the fetch scope while $profileScope stays put
   // (#126732): refresh the slices for the bot now selected.

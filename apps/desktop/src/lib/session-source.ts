@@ -1,3 +1,5 @@
+import { atom } from 'nanostores'
+
 import { normalize } from '@/lib/text'
 
 const SOURCE_LABELS: Record<string, string> = {
@@ -86,12 +88,91 @@ export const MESSAGING_SESSION_SOURCE_IDS = [
 ]
 const MESSAGING_SOURCE_IDS = new Set(MESSAGING_SESSION_SOURCE_IDS)
 
+// Sources that are never a messaging platform, even if a backend catalog
+// lists them: local surfaces plus the cron/subagent/tool bookkeeping sources.
+const NEVER_MESSAGING_SOURCE_IDS = new Set([...LOCAL_SESSION_SOURCE_IDS, 'cron', 'subagent', 'tool'])
+
+/** A gateway platform the connected backend reports via
+ *  `GET /api/messaging/platforms`: built-in adapters AND plugin-registered
+ *  platforms (`ctx.register_platform(...)`, e.g. a OneBot, SimpleX or voice
+ *  adapter). The hardcoded list above stays the fallback for an older backend
+ *  or before the catalog has loaded. */
+export interface RegisteredMessagingPlatform {
+  id: string
+  name?: null | string
+}
+
+const REGISTERED_PLATFORMS_STORAGE_KEY = 'hermes.registeredMessagingPlatforms.v1'
+
+function readCachedRegisteredPlatforms(): Record<string, string> {
+  try {
+    const raw = globalThis.localStorage?.getItem(REGISTERED_PLATFORMS_STORAGE_KEY)
+    const parsed: unknown = raw ? JSON.parse(raw) : null
+
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      return Object.fromEntries(
+        Object.entries(parsed as Record<string, unknown>).filter(
+          (entry): entry is [string, string] => typeof entry[1] === 'string'
+        )
+      )
+    }
+  } catch {
+    // Storage unavailable or corrupt: start empty, the catalog fetch refills it.
+  }
+
+  return {}
+}
+
+/** Registered (non-hardcoded) messaging platforms: normalized id -> display
+ *  name. Seeded from the last catalog seen so plugin sections render on the
+ *  first paint instead of flashing through local recents. */
+export const $registeredMessagingPlatforms = atom<Record<string, string>>(readCachedRegisteredPlatforms())
+
+/** Record the backend's platform catalog. Returns true when the set of
+ *  messaging source ids changed (callers re-fetch the sidebar slices then). */
+export function setRegisteredMessagingPlatforms(platforms: readonly RegisteredMessagingPlatform[]): boolean {
+  const next: Record<string, string> = {}
+
+  for (const platform of platforms) {
+    const id = normalizeSessionSource(platform.id)
+
+    if (!id || NEVER_MESSAGING_SOURCE_IDS.has(id) || MESSAGING_SOURCE_IDS.has(id)) {
+      continue
+    }
+
+    next[id] = platform.name?.trim() || id
+  }
+
+  const prev = $registeredMessagingPlatforms.get()
+  const prevKeys = Object.keys(prev).sort().join('\u0000')
+  const nextKeys = Object.keys(next).sort().join('\u0000')
+  const changed = prevKeys !== nextKeys
+
+  if (changed || Object.keys(next).some(id => prev[id] !== next[id])) {
+    $registeredMessagingPlatforms.set(next)
+
+    try {
+      globalThis.localStorage?.setItem(REGISTERED_PLATFORMS_STORAGE_KEY, JSON.stringify(next))
+    } catch {
+      // Non-fatal: the cache only speeds up the next launch.
+    }
+  }
+
+  return changed
+}
+
+/** Every source id that gets its own sidebar section: the built-in list plus
+ *  whatever the backend registered (plugins included). */
+export function messagingSessionSourceIds(): string[] {
+  return [...MESSAGING_SESSION_SOURCE_IDS, ...Object.keys($registeredMessagingPlatforms.get())]
+}
+
 /** True when a source id is an external messaging platform (gets its own
  *  sidebar section) rather than a local/CLI/desktop session. */
 export function isMessagingSource(source: null | string | undefined): boolean {
   const id = normalizeSessionSource(source)
 
-  return id != null && MESSAGING_SOURCE_IDS.has(id)
+  return id != null && (MESSAGING_SOURCE_IDS.has(id) || id in $registeredMessagingPlatforms.get())
 }
 
 export function normalizeSessionSource(source: null | string | undefined): string | null {
@@ -128,7 +209,11 @@ export function sessionSourceLabel(source: null | string | undefined): string | 
     return null
   }
 
-  return SOURCE_LABELS[id] || id.replace(/[_-]+/g, ' ').replace(/\b\w/g, char => char.toUpperCase())
+  return (
+    SOURCE_LABELS[id] ||
+    $registeredMessagingPlatforms.get()[id] ||
+    id.replace(/[_-]+/g, ' ').replace(/\b\w/g, char => char.toUpperCase())
+  )
 }
 
 export function sessionSourceSearchTerms(source: null | string | undefined): string[] {
