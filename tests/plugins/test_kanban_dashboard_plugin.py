@@ -1291,3 +1291,19 @@ def test_ws_events_for_archived_board_does_not_recreate_it(tmp_path, monkeypatch
         "/api/plugins/kanban/events?token=secret-xyz&board=alive"
     ) as ws:
         assert ws is not None
+
+
+def test_create_task_links_an_existing_session_and_refuses_an_unknown_one(client, kanban_home):
+    from tests.fixtures.storage_seed import seed_session
+    from tests.gateway.fixtures.storage_handles import storage_handle
+    seed_session(storage_handle(kanban_home), "errand-chat", "desktop")
+
+    r = client.post("/api/plugins/kanban/tasks", json={"title": "buy filters", "triage": True,
+                                                     "session_id": "errand-chat"})
+    assert r.status_code == 200, r.text
+    assert r.json()["task"]["session_id"] == "errand-chat"
+
+    r = client.post("/api/plugins/kanban/tasks", json={"title": "ghost", "session_id": "no-such-chat"})
+    assert r.status_code == 400 and r.json()["detail"] == "unknown session_id"
+    board = client.get("/api/plugins/kanban/board").json()
+    assert [t["title"] for c in board["columns"] for t in c["tasks"]] == ["buy filters"]

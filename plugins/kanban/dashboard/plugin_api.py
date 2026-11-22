@@ -428,13 +428,23 @@ class CreateTaskBody(BaseModel):
     provider_override: Optional[str] = None
     reasoning_effort: Optional[str] = None  # none|minimal|…|ultra; None inherits the profile's level
     project_id: Optional[str] = None  # None inherits the board's scoped project (if any)
+    # The chat this task came from (an iOS errand): kept only when it has a row in this profile's
+    # state.db, the same check kanban_create applies before stamping.
+    session_id: Optional[str] = Field(None, max_length=256)
 
 
 @router.post("/tasks")
 def create_task(payload: CreateTaskBody, board: Optional[str] = Query(None)):
+    fields = payload.model_dump()
+    if fields["session_id"]:
+        from tools.kanban_tools import _persisted_session_id
+        if _persisted_session_id(fields["session_id"]) is None:
+            raise HTTPException(status_code=400, detail="unknown session_id")
+    else:
+        fields["session_id"] = None
     with _board_conn(board) as (board, conn), _value_error_400():
         # CreateTaskBody field names match create_task's keyword parameters.
-        task_id = kanban_db.create_task(conn, created_by="dashboard", board=board, **payload.model_dump())
+        task_id = kanban_db.create_task(conn, created_by="dashboard", board=board, **fields)
         task = kanban_db.get_task(conn, task_id)
         body: dict[str, Any] = {"task": _task_dict(
             task, current_run_started_at=kanban_db.current_run_started_ats(conn, [task_id]).get(task_id)
