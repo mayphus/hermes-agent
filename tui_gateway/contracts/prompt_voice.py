@@ -10,7 +10,7 @@ from __future__ import annotations
 from pydantic import Field
 
 from .base import JsonValue, Params, Result, WireEnum
-from .common import OpenModel, PendingApproval, SessionAttached, SessionParams
+from .common import OpenModel, PendingApproval, SessionParams
 from .registry import method
 
 # ── prompt.submit ─────────────────────────────────────────────────────────────────────────────
@@ -38,7 +38,6 @@ class PromptSubmitParams(SessionParams):
     voice_turn: bool | None = None  # a spoken voice-conversation turn: runs on auxiliary.voice_chat
     # Desktop-generated large-paste preview (first ~1000 chars); TITLE input only, never the model turn.
     title_preview: str | None = None
-    attached: SessionAttached | None = None  # set only when the session has none yet
     truncate_before_user_ordinal: int | None = None
     truncate_before_row_id: int | None = None
     truncate_before_message_id: str | None = None

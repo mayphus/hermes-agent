@@ -34,6 +34,15 @@ def test_malformed_attachment_is_refused(value):
         session_attached.parse(value)
 
 
+def test_the_owner_wire_contract_takes_attached_on_create_and_submit():
+    from tui_gateway.contracts.registry import CANONICAL_METHODS, canonical_param_problems
+    attached = {"kind": "decision", "id": "d1"}
+    assert not canonical_param_problems(CANONICAL_METHODS["session.create"], {"attached": attached})
+    assert not canonical_param_problems(CANONICAL_METHODS["prompt.submit"],
+                                        {"session_id": "s", "text": "hi", "attached": attached})
+    assert canonical_param_problems(CANONICAL_METHODS["session.create"], {"attached": {"kind": "errand", "id": "x"}})
+
+
 def test_first_writer_wins_and_the_dashboard_lists_by_attachment(store, auth_client):
     for sid in ("chat-a", "chat-b", "chat-c"):
         seed_session(store, sid, "desktop")

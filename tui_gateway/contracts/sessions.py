@@ -8,7 +8,7 @@ from __future__ import annotations
 from pydantic import Field
 
 from .base import JsonValue, Params, Result, WireEnum
-from .common import (OpenModel, PendingApproval, ProfileParams, SessionAttached, SessionLiveInfo, SessionParams, TranscriptMessage,
+from .common import (OpenModel, PendingApproval, ProfileParams, SessionLiveInfo, SessionParams, TranscriptMessage,
                      UndoRollbackHint, Usage)
 from .connectors_operation import ConnectionRequestPayload
 from .registry import method
@@ -137,7 +137,6 @@ class SessionCreateParams(ProfileParams):
     # #65410: stable caller-chosen key so a retried create (response lost in
     # transit) returns the SAME session instead of a duplicate child.
     idempotency_key: str | None = None
-    attached: SessionAttached | None = None  # first writer wins (also prompt.submit)
 
 
 class SessionCreateResult(Result):

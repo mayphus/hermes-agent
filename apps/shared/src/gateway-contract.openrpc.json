@@ -8828,6 +8828,17 @@
             "default": null,
             "title": "Request Id"
           },
+          "attached": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SessionAttached"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
           "source": {
             "default": "cli",
             "enum": [
@@ -11822,6 +11833,17 @@
           "text": {
             "title": "Text",
             "type": "string"
+          },
+          "attached": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SessionAttached"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
           },
           "submission_id": {
             "anyOf": [
@@ -34212,17 +34234,6 @@
             "default": null,
             "title": "Title Preview"
           },
-          "attached": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/SessionAttached"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null
-          },
           "truncate_before_user_ordinal": {
             "anyOf": [
               {
@@ -38820,17 +38831,6 @@
             ],
             "default": null,
             "title": "Idempotency Key"
-          },
-          "attached": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/SessionAttached"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null
           }
         },
         "title": "SessionCreateParams",

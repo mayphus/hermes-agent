@@ -7,7 +7,7 @@ from typing import Literal
 from pydantic import RootModel
 
 from .base import JsonValue, Params, Result
-from .common import ProfileParams, TranscriptMessage
+from .common import ProfileParams, SessionAttached, TranscriptMessage
 from .connectors_operation import ConnectionRequestPayload
 from .sessions import OpenRequestEntry, TodoState
 from .canonical import (AdmissionStatus, CanonicalClientLabel, CanonicalSessionRef, PromptResponseResult,
@@ -29,6 +29,7 @@ class CanonicalClientIdentity(Params):
 
 class CanonicalCreateParams(ProfileParams):
     request_id: str | None = None
+    attached: SessionAttached | None = None  # what the session is about; first writer wins
     source: Literal['cli', 'tui', 'gui', 'acp', 'tool', 'oneshot'] = 'cli'
     cwd: str | None = None
     # The sessions-row ``cwd`` when it differs from the execution ``cwd`` (the classic CLI records
@@ -248,6 +249,7 @@ class CanonicalModelOverride(Params):
 
 class CanonicalSubmitParams(CanonicalSessionParams):
     text: str
+    attached: SessionAttached | None = None  # set only when the session has none yet
     submission_id: str | None = None
     input_id: str | None = None
     queued: bool = False
