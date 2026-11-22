@@ -34212,6 +34212,17 @@
             "default": null,
             "title": "Title Preview"
           },
+          "attached": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SessionAttached"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
           "truncate_before_user_ordinal": {
             "anyOf": [
               {
@@ -37465,6 +37476,33 @@
         "title": "SessionArchiveResult",
         "type": "object"
       },
+      "SessionAttached": {
+        "additionalProperties": false,
+        "description": "What a session is about, set once by its client (``gateway/session_attached.py``).",
+        "properties": {
+          "kind": {
+            "enum": [
+              "task",
+              "project",
+              "decision"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "id"
+        ],
+        "title": "SessionAttached",
+        "type": "object"
+      },
       "SessionAutomationParams": {
         "additionalProperties": false,
         "properties": {
@@ -38782,6 +38820,17 @@
             ],
             "default": null,
             "title": "Idempotency Key"
+          },
+          "attached": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SessionAttached"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
           }
         },
         "title": "SessionCreateParams",

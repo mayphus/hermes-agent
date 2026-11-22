@@ -527,6 +527,8 @@ class AuthorityConnection:
         hidden = params.pop('hidden', False)
         if type(hidden) is not bool:
             raise AuthorityRefusal('invalid_params', field='hidden', detail='must be a boolean')
+        from gateway import session_attached
+        attached = session_attached.parse(params.pop('attached', None))
         ref = title and resolve_titled_session(self.authority, self.actor, title, missing_ok=True)
         if (not ref and title == 'Bot Chat'
                 and not any(params.get(name) is True for name in BYPASS_FIELDS)
@@ -566,6 +568,8 @@ class AuthorityConnection:
                 await tracked_write(self.authority, partial(title_new_session, self.authority, ref, title))
             if hidden:
                 await tracked_write(self.authority, partial(store.sessions.set_hidden, ref.session_id, True))
+        if attached is not None:
+            await tracked_write(self.authority, partial(session_attached.set_if_unset, store, ref.session_id, attached))
         return await self.resume(ref, {})
 
     async def ping(self, ref, params):
@@ -822,6 +826,14 @@ class AuthorityConnection:
         return {**replay, 'open_requests': open_requests(stream, ref.session_id)}
 
     async def submit(self, ref, params):
+        from gateway import session_attached
+        attached = session_attached.parse(params.pop('attached', None))
+        if attached is not None:
+            if ref.session_id not in self.subscriptions:
+                raise AuthorityRefusal('permission_denied')
+            from gateway.session_runtime_workers import tracked_write
+            await tracked_write(self.authority, partial(session_attached.set_if_unset,
+                                                        authority_persistence(self.authority), ref.session_id, attached))
         if self._voice_stop_replay(ref, params) or await self._typed_voice_stop(ref, params):
             self._record_voice_stop(ref, params)
             return {'voice_stopped': True}

@@ -207,13 +207,17 @@ def get_sessions(
     limit: int = Query(20, ge=0, le=100), offset: int = Query(0, ge=0), min_messages: int = 0,
     archived: str = "exclude", order: str = "created", source: str | None = None, sources: str | None = None,
     exclude_sources: str | None = None, cwd_prefix: str | None = None, full: bool = False,
-    profile: Optional[str] = None):
+    profile: Optional[str] = None, attached_kind: str | None = None, attached_id: str | None = None):
     """List sessions.
 
     ``order=recent`` sorts by latest activity across the compression chain, so
     a long-running chat stays on page one after it auto-compresses onto a fresh
     id.  Rows omit ``system_prompt`` / ``model_config`` unless ``full=1``.
+    ``attached_kind`` + ``attached_id`` list only the sessions attached to that task, project or
+    decision (newest first; the other filters do not apply); see :func:`_attached_sessions`.
     """
+    if attached_kind is not None or attached_id is not None:
+        return _attached_sessions(profile, attached_kind, attached_id, limit=limit, offset=offset, full=full)
     if archived not in ("exclude", "only", "include"):
         raise HTTPException(
             status_code=400, detail="archived must be one of: exclude, only, include")
@@ -299,6 +303,55 @@ def get_sessions(
     except Exception:
         _log.exception("GET /api/sessions failed")
         raise HTTPException(status_code=500, detail="Internal server error")
+
+
+def _kanban_task_session(task_id: str) -> Optional[str]:
+    """The ``session_id`` a kanban task carries, searched across the live boards."""
+    from hermes_cli import kanban_db
+    from hermes_cli.kanban_db_boards import list_boards
+    from hermes_cli.kanban_db_connect import connect_closing
+    for board in list_boards(include_archived=False):
+        db_path = board.get("db_path")
+        if not db_path or not Path(db_path).exists():
+            continue
+        with connect_closing(Path(db_path)) as conn:
+            task = kanban_db.get_task(conn, task_id)
+        if task is not None:
+            return task.session_id or None
+    return None
+
+
+def _attached_sessions(profile, kind, attached_id, *, limit, offset, full):
+    """Sessions attached to ``kind``/``attached_id`` (``gateway/session_attached.py``); for a task,
+    also the session its kanban card names in ``tasks.session_id``."""
+    from gateway import session_attached
+    if kind not in session_attached.KINDS or not attached_id or len(attached_id) > session_attached.ID_MAX:
+        raise HTTPException(status_code=400, detail="attached_kind must be task, project or decision and "
+                                                    f"attached_id 1-{session_attached.ID_MAX} chars")
+    profile_name = _cron_profile_home(profile)[0] if profile else _cron_default_profile()
+    with _profile_store(profile, read_only=True) as store:
+        ids = session_attached.sessions_attached_to(store, kind, attached_id)
+        if kind == "task":
+            linked = _kanban_task_session(attached_id)
+            if linked and linked not in ids:
+                ids.append(linked)
+        rows, now = [], time.time()
+        for sid in ids:
+            record = store.sessions.get(sid)
+            if record is None:
+                continue
+            row = record.as_session_row()
+            row["attached"] = session_attached.read(store, sid) or {"kind": kind, "id": attached_id}
+            row["last_active"] = row.get("last_activity_at") or row.get("ended_at") or row.get("started_at")
+            row["is_active"] = _is_active(row, now)
+            row["profile"] = profile_name
+            row["archived"], row["pinned"] = bool(row.get("archived")), bool(row.get("pinned"))
+            rows.append(row)
+    rows.sort(key=lambda row: row.get("started_at") or 0, reverse=True)
+    if not full:
+        _strip_session_list_rows(rows)
+    return {"sessions": rows[offset:offset + limit], "total": len(rows), "limit": limit, "offset": offset,
+            "storage": {}}
 
 
 def _is_compression_edge(child, parent) -> bool:

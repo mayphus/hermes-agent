@@ -2889,6 +2889,7 @@ export interface PromptSubmitParams {
   voice_context?: string | null
   voice_turn?: boolean | null
   title_preview?: string | null
+  attached?: SessionAttached | null
   truncate_before_user_ordinal?: number | null
   truncate_before_row_id?: number | null
   truncate_before_message_id?: string | null
@@ -2896,6 +2897,11 @@ export interface PromptSubmitParams {
   confirm_empty_truncate?: boolean | null
   confirm_deep_truncate?: boolean | null
   rebind_survivor_row_ids?: number[] | null
+}
+/** What a session is about, set once by its client (``gateway/session_attached.py``). */
+export interface SessionAttached {
+  kind: 'task' | 'project' | 'decision'
+  id: string
 }
 /** ``status`` is absent only on the typed-stop-phrase reply (``voice_stopped``). After a truncation the survivor row ids let the client rebind its cached ``rowId``s (``None`` map entries: drop the cached id). ``turn_isolation`` marks a compute-host dispatch. */
 export interface PromptSubmitResult {
@@ -3232,6 +3238,7 @@ export interface SessionCreateParams {
   room_plumbing?: boolean
   follow_profile_config?: boolean
   idempotency_key?: string | null
+  attached?: SessionAttached | null
 }
 /** One create-time transcript row (``session_history._coerce_seed_history``); ``text`` is the legacy alias of ``content``; only ``display_kind: "hidden"`` is accepted from the wire. Clients forward stored rows verbatim (``_row_id``, ``timestamp``, …) and the coercer drops what it does not use, so the row stays open. */
 export interface SeedMessage {

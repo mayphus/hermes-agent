@@ -238,6 +238,13 @@ class SessionParams(Params):
     profile: str | None = None
 
 
+class SessionAttached(Params):
+    """What a session is about, set once by its client (``gateway/session_attached.py``)."""
+
+    kind: Literal["task", "project", "decision"]
+    id: str = Field(min_length=1, max_length=128)
+
+
 class ProfileParams(Params):
     """Any method the desktop may route to a named profile (``requestGatewayForProfile`` adds ``profile``)."""
 
