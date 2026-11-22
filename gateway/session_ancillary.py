@@ -26,6 +26,7 @@ def handlers(connection):
         'session.control.read': 'control', 'process.list': 'processes',
         'subagent.list': 'subagents', 'subagent.tail': 'tail',
     }.items()}, 'approval.pending': partial(approvals, connection),
+        'approval.pending_all': partial(pending_all, connection),
         'approval.received': partial(approvals, connection, ack=True),
         'process.stop': partial(stop_processes, connection),
         'process.kill': partial(kill_process, connection), 'reload.mcp': partial(reload_mcp, connection),
@@ -221,6 +222,46 @@ async def approvals(connection, ref, params, *, ack=False):
     return {'approvals': [{'request_id': prompt['prompt_id'], 'command': prompt['command'],
                            'description': prompt['description'], 'choices': list(prompt['choices']),
                            'allow_permanent': 'always' in prompt['choices']} for _, prompt in pending]}
+
+
+_SUMMARY_CHARS = 200
+
+
+def _prompt_summary(prompt):
+    """One short, redacted line for a cross-session list: the prompt text is already approval-redacted
+    at registration; the general secret patterns run again (forced) before it is cut."""
+    from agent.redact import redact_sensitive_text
+    if prompt['kind'] == 'clarify':
+        text = prompt.get('question') or ''
+    else:
+        text = ' — '.join(part for part in (prompt.get('description'), prompt.get('command')) if part)
+    text = ' '.join(redact_sensitive_text(str(text), force=True).split())
+    return text if len(text) <= _SUMMARY_CHARS else text[:_SUMMARY_CHARS - 1] + '…'
+
+
+async def pending_all(connection, _ref, params):
+    """``approval.pending_all``: every approval / clarify prompt still parked on the user across the
+    sessions this actor may read. Read-only: nothing is answered, settled or published; an answer goes
+    through the per-session ``approval.respond`` / ``clarify.respond`` with the row's identity."""
+    if set(params) - {'profile'}:
+        raise AuthorityRefusal('invalid_params')
+    if 'session:read' not in connection.actor.capabilities:
+        raise AuthorityRefusal('permission_denied')
+    from gateway.session_live_listing import _readable
+    authority, rows = connection.authority, []
+    for session_id, live in list(authority.sessions.items()):
+        controls = getattr(live, 'controls', None)
+        if controls is None or not controls.pending or not _readable(authority, connection.actor, session_id):
+            continue
+        for prompt in controls.waiting():
+            if prompt['kind'] not in ('approval', 'clarify'):
+                continue
+            rows.append({'session_id': session_id, 'request_id': prompt['prompt_id'], 'kind': prompt['kind'],
+                         'summary': _prompt_summary(prompt), 'choices': list(prompt.get('choices') or []),
+                         'multi_select': bool(prompt.get('multi_select', False)), 'since': prompt.get('since'),
+                         'execution_generation': prompt['execution_generation']})
+    rows.sort(key=lambda row: row['since'] or 0)
+    return {'prompts': rows}
 
 
 async def read(connection, ref, params, *, kind):

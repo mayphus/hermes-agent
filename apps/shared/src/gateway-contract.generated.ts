@@ -5076,6 +5076,23 @@ export interface PromptResponseResult {
   status: 'resolved' | 'already_resolved'
   prompt_id: string
 }
+export interface ApprovalPendingAllParams {
+  profile?: string | null
+}
+export interface ApprovalPendingAllResult {
+  prompts: PendingPrompt[]
+}
+/** One prompt parked on the user; ``summary`` is redacted and cut short. Answer it with ``approval.respond`` / ``clarify.respond`` using ``session_id``, ``request_id`` as ``prompt_id`` and ``execution_generation``. */
+export interface PendingPrompt {
+  session_id: string
+  request_id: string
+  kind: 'approval' | 'clarify'
+  summary: string
+  choices: string[]
+  multi_select?: boolean
+  since?: number | null
+  execution_generation: number
+}
 export interface CronRunParams {
   job_id: string
   request_id: string
@@ -7171,6 +7188,8 @@ export const RPC_METHODS = [
 export interface CanonicalRpcMethods {
   /** Forward one A2A input into the conversation its identity tuple names. */
   'a2a.forward': { params: A2aForwardParams; result: A2aForwardResult }
+  /** Every approval / clarify prompt waiting on the user across readable sessions (read-only). */
+  'approval.pending_all': { params: ApprovalPendingAllParams; result: ApprovalPendingAllResult }
   'approval.respond': { params: CanonicalApprovalParams; result: PromptResponseResult }
   'bot_relay.cancel': { params: CanonicalBotCancelParams; result: CanonicalBotCancelResult }
   'bot_relay.deliver': { params: CanonicalBotDeliverParams; result: CanonicalBotDeliverResult }
@@ -7262,6 +7281,7 @@ export interface CanonicalRpcMethods {
 export type CanonicalRpcMethod = keyof CanonicalRpcMethods
 export const CANONICAL_RPC_METHODS = [
   'a2a.forward',
+  'approval.pending_all',
   'approval.respond',
   'bot_relay.cancel',
   'bot_relay.deliver',

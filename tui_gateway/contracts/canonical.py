@@ -444,6 +444,33 @@ class PromptResponseResult(Result):
 canonical_method("clarify.respond", params=ClarifyRespondParams, result=PromptResponseResult,
                  doc="Generation-fenced answer to a pending clarify prompt (empty answer = skipped).")
 
+
+class ApprovalPendingAllParams(Params):
+    profile: str | None = None
+
+
+class PendingPrompt(Result):
+    """One prompt parked on the user; ``summary`` is redacted and cut short. Answer it with
+    ``approval.respond`` / ``clarify.respond`` using ``session_id``, ``request_id`` as ``prompt_id``
+    and ``execution_generation``."""
+
+    session_id: str
+    request_id: str
+    kind: Literal["approval", "clarify"]
+    summary: str
+    choices: list[str]
+    multi_select: bool = False
+    since: float | None = None
+    execution_generation: int
+
+
+class ApprovalPendingAllResult(Result):
+    prompts: list[PendingPrompt]
+
+
+canonical_method("approval.pending_all", params=ApprovalPendingAllParams, result=ApprovalPendingAllResult,
+                 doc="Every approval / clarify prompt waiting on the user across readable sessions (read-only).")
+
 # The owner serves the sidecar's ``clarify.lock`` wire unchanged (``gateway/session_clarify_lock.py``):
 # declaring it here lets the dispatcher refuse a mistyped or unknown key before the handler runs.
 canonical_method("clarify.lock", params=ClarifyLockParams, result=ClarifyLockResult,

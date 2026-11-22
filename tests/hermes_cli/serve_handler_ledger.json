@@ -2,10 +2,10 @@
  "counts": {
   "http": {
    "keep-host-wide": 1,
-   "undecided": 349
+   "undecided": 351
   },
   "rpc": {
-   "authority": 113,
+   "authority": 114,
    "keep-host-wide": 1,
    "undecided": 179
   },
@@ -51,6 +51,7 @@
   {"current_path": "hermes_cli.web_routers.actions:get_action_status", "decision": "undecided", "handler": "GET /api/actions/{name}/status", "kind": "http", "ref": ""},
   {"current_path": "hermes_cli.web_routers.analytics:get_models_analytics", "decision": "undecided", "handler": "GET /api/analytics/models", "kind": "http", "ref": ""},
   {"current_path": "hermes_cli.web_routers.analytics:get_usage_analytics", "decision": "undecided", "handler": "GET /api/analytics/usage", "kind": "http", "ref": ""},
+  {"current_path": "hermes_cli.web_routers.approvals:pending_prompts", "decision": "undecided", "handler": "GET /api/approvals/pending", "kind": "http", "ref": ""},
   {"current_path": "hermes_cli.web_routers.audio:get_elevenlabs_voices", "decision": "undecided", "handler": "GET /api/audio/elevenlabs/voices", "kind": "http", "ref": ""},
   {"current_path": "hermes_cli.web_routers.audio:get_client_voice_config", "decision": "undecided", "handler": "GET /api/audio/voice-config", "kind": "http", "ref": ""},
   {"current_path": "hermes_cli.web_routers.audio:get_voice_live_status", "decision": "undecided", "handler": "GET /api/audio/voice-live/status", "kind": "http", "ref": ""},
@@ -209,6 +210,7 @@
   {"current_path": "hermes_cli.web_routers.profiles:rename_profile_endpoint", "decision": "undecided", "handler": "PATCH /api/profiles/{name}", "kind": "http", "ref": ""},
   {"current_path": "hermes_cli.web_routers.sessions:rename_session_endpoint", "decision": "undecided", "handler": "PATCH /api/sessions/{session_id}", "kind": "http", "ref": ""},
   {"current_path": "hermes_cli.web_routers.ui_preferences:patch_ui_preferences; surface: ui_preferences", "decision": "undecided", "handler": "PATCH /api/ui-preferences", "kind": "http", "ref": ""},
+  {"current_path": "hermes_cli.web_routers.approvals:respond_prompt", "decision": "undecided", "handler": "POST /api/approvals/respond", "kind": "http", "ref": ""},
   {"current_path": "hermes_cli.web_routers.audio:speak_text", "decision": "undecided", "handler": "POST /api/audio/speak", "kind": "http", "ref": ""},
   {"current_path": "hermes_cli.web_routers.audio:stt_lease", "decision": "undecided", "handler": "POST /api/audio/stt-lease", "kind": "http", "ref": ""},
   {"current_path": "hermes_cli.web_routers.audio:transcribe_audio_upload", "decision": "undecided", "handler": "POST /api/audio/transcribe", "kind": "http", "ref": ""},
@@ -385,6 +387,7 @@
   {"current_path": "authority; standalone: unknown method", "decision": "authority", "handler": "a2a.forward", "kind": "rpc", "ref": ""},
   {"current_path": "authority refuses (-32601); standalone: legacy server.dispatch", "decision": "undecided", "handler": "agents.list", "kind": "rpc", "ref": "D3"},
   {"current_path": "authority; standalone: legacy server.dispatch", "decision": "authority", "handler": "approval.pending", "kind": "rpc", "ref": ""},
+  {"current_path": "authority; standalone: unknown method", "decision": "authority", "handler": "approval.pending_all", "kind": "rpc", "ref": ""},
   {"current_path": "authority; standalone: legacy server.dispatch", "decision": "authority", "handler": "approval.received", "kind": "rpc", "ref": ""},
   {"current_path": "authority; standalone: legacy server.dispatch", "decision": "authority", "handler": "approval.respond", "kind": "rpc", "ref": ""},
   {"current_path": "legacy fallback; standalone: legacy server.dispatch", "decision": "undecided", "handler": "billing.auto_reload", "kind": "rpc", "ref": "D3"},

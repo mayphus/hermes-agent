@@ -4,6 +4,7 @@ Ordinary approvals and clarify prompts share the existing native waiters.
 Secret/sudo prompts remain native; no response is published or journaled here.
 """
 from copy import deepcopy
+import time
 
 from persistence.core.errors import AuthorityRefusal
 from tools.approval import list_gateway_approvals, resolve_gateway_approval
@@ -14,6 +15,7 @@ class PendingControls:
         self.events = events
         self.pending = {}
         self.remote_responders = {}
+        self.since = {}  # prompt_id -> wall-clock time it was registered
 
     def register(self, session_id, route, generation, data, *, timeout_s=None):
         from gateway.run import _redact_approval_command
@@ -35,6 +37,7 @@ class PendingControls:
             if timeout_s is not None:
                 prompt['timeout_s'] = timeout_s
             self.pending[prompt_id] = (route, prompt)
+            self.since[prompt_id] = time.time()
             self.events.publish(session_id, prompt, event_type='approval.request')
 
     def register_clarify(self, session_id, generation, entry, *, timeout_s=None):
@@ -48,6 +51,7 @@ class PendingControls:
             if timeout_s is not None:
                 prompt["timeout_s"] = timeout_s
             self.pending[entry.clarify_id] = (entry, prompt)
+            self.since[entry.clarify_id] = time.time()
             self.events.publish(session_id, prompt, event_type="clarify.request")
 
     def waiting_kinds(self):
@@ -55,16 +59,26 @@ class PendingControls:
         teammate-wait strip polls this from another bot's chat; ``snapshot`` stays the viewer's)."""
         with self.events.lock:
             return sorted({prompt['kind'] for prompt_id, (route, prompt) in self.pending.items()
-                           if prompt_id in self.remote_responders or (
-                               not route.event.is_set() if prompt['kind'] == 'clarify' else
-                               any(p['request_id'] == prompt_id for p in list_gateway_approvals(route)))})
+                           if self._open(prompt_id, route, prompt)})
+
+    def waiting(self):
+        """Copies of the prompts still parked on the user, each with ``since``; like ``waiting_kinds``
+        it never prunes or publishes (the cross-session ``approval.pending_all`` poll)."""
+        with self.events.lock:
+            for gone in set(self.since) - set(self.pending):
+                del self.since[gone]
+            return [{**deepcopy(prompt), 'since': self.since.get(prompt_id)}
+                    for prompt_id, (route, prompt) in self.pending.items() if self._open(prompt_id, route, prompt)]
+
+    def _open(self, prompt_id, route, prompt):
+        return prompt_id in self.remote_responders or (
+            not route.event.is_set() if prompt['kind'] == 'clarify' else
+            any(p['request_id'] == prompt_id for p in list_gateway_approvals(route)))
 
     def snapshot(self, session_id, generation):
         with self.events.lock:
             for prompt_id, (route, prompt) in list(self.pending.items()):
-                active = (prompt_id in self.remote_responders or
-                          (not route.event.is_set() if prompt['kind'] == 'clarify' else
-                           any(p['request_id'] == prompt_id for p in list_gateway_approvals(route))))
+                active = self._open(prompt_id, route, prompt)
                 if prompt['execution_generation'] != generation or not active:
                     del self.pending[prompt_id]
                     self.remote_responders.pop(prompt_id, None)

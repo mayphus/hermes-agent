@@ -5387,6 +5387,42 @@
         "title": "ApprovalChoice",
         "type": "string"
       },
+      "ApprovalPendingAllParams": {
+        "additionalProperties": false,
+        "properties": {
+          "profile": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Profile"
+          }
+        },
+        "title": "ApprovalPendingAllParams",
+        "type": "object"
+      },
+      "ApprovalPendingAllResult": {
+        "additionalProperties": false,
+        "properties": {
+          "prompts": {
+            "items": {
+              "$ref": "#/components/schemas/PendingPrompt"
+            },
+            "title": "Prompts",
+            "type": "array"
+          }
+        },
+        "required": [
+          "prompts"
+        ],
+        "title": "ApprovalPendingAllResult",
+        "type": "object"
+      },
       "ApprovalPendingParams": {
         "additionalProperties": false,
         "properties": {
@@ -26801,6 +26837,70 @@
           }
         },
         "title": "PendingApproval",
+        "type": "object"
+      },
+      "PendingPrompt": {
+        "additionalProperties": false,
+        "description": "One prompt parked on the user; ``summary`` is redacted and cut short. Answer it with\n``approval.respond`` / ``clarify.respond`` using ``session_id``, ``request_id`` as ``prompt_id``\nand ``execution_generation``.",
+        "properties": {
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "approval",
+              "clarify"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "summary": {
+            "title": "Summary",
+            "type": "string"
+          },
+          "choices": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Choices",
+            "type": "array"
+          },
+          "multi_select": {
+            "default": false,
+            "title": "Multi Select",
+            "type": "boolean"
+          },
+          "since": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Since"
+          },
+          "execution_generation": {
+            "title": "Execution Generation",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "session_id",
+          "request_id",
+          "kind",
+          "summary",
+          "choices",
+          "execution_generation"
+        ],
+        "title": "PendingPrompt",
         "type": "object"
       },
       "PersistedTurn": {
@@ -50431,6 +50531,24 @@
         "name": "result",
         "schema": {
           "$ref": "#/components/schemas/A2aForwardResult"
+        }
+      }
+    },
+    {
+      "name": "approval.pending_all",
+      "summary": "Every approval / clarify prompt waiting on the user across readable sessions (read-only).",
+      "params": [
+        {
+          "name": "params",
+          "schema": {
+            "$ref": "#/components/schemas/ApprovalPendingAllParams"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "#/components/schemas/ApprovalPendingAllResult"
         }
       }
     },
