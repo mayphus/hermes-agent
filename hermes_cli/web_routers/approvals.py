@@ -3,7 +3,8 @@
 ``GET /api/approvals/pending`` lists them (the owner's read-only ``approval.pending_all``);
 ``POST /api/approvals/respond`` forwards ONE explicit answer to the owner's existing per-session
 ``approval.respond`` / ``clarify.respond``, generation-fenced, so a stale click never answers a newer
-prompt. Nothing here answers on its own. Both reach the live gateway owner over its control socket,
+prompt. The owner only takes an answer from a viewer of the session, so the forward attaches as one
+(``session.resume`` without the transcript), answers, and detaches again, as a Desktop tab would. Nothing here answers on its own. Both reach the live gateway owner over its control socket,
 as a standalone dashboard's session mutations do (``web_server_sessions._mutate_via_gateway_owner``):
 pending prompts live only in the owner's memory, never in state.db.
 """
@@ -30,7 +31,8 @@ class PromptAnswer(BaseModel):
     profile: Optional[str] = None
 
 
-async def _owner_rpc(request: Request, profile: Optional[str], method: str, **params):
+async def _owner_rpc(request: Request, profile: Optional[str], calls):
+    """Run ``calls(client)`` on one owner connection; owner refusals map to HTTP statuses."""
     from gateway.owner_identity import host_owner_subject
     from hermes_cli.gateway_client import GatewayClientError, GatewayRPCError, connect_gateway
     from hermes_cli.gateway_runtime import discover_gateway_endpoint
@@ -49,7 +51,7 @@ async def _owner_rpc(request: Request, profile: Optional[str], method: str, **pa
     subject = None if actor.subject == host_owner_subject() else actor.subject
     try:
         async with connect_gateway(endpoint=endpoint, subject=subject) as client:
-            return await client.rpc(method, **params)
+            return await calls(client)
     except GatewayRPCError as exc:
         if exc.unknown_method:
             raise HTTPException(status_code=503, detail='owner_too_old: restart the gateway') from exc
@@ -61,7 +63,7 @@ async def _owner_rpc(request: Request, profile: Optional[str], method: str, **pa
 @router.get("/api/approvals/pending")
 async def pending_prompts(request: Request, profile: Optional[str] = None):
     """``[{session_id, request_id, kind, summary, choices, multi_select, since, execution_generation}]``."""
-    result = await _owner_rpc(request, profile, 'approval.pending_all')
+    result = await _owner_rpc(request, profile, lambda client: client.rpc('approval.pending_all'))
     return result.get('prompts', [])
 
 
@@ -69,6 +71,15 @@ async def pending_prompts(request: Request, profile: Optional[str] = None):
 async def respond_prompt(request: Request, body: PromptAnswer):
     """One explicit answer, as the per-session verbs take it; ``already_resolved`` when it was settled."""
     field = 'answer' if body.kind == 'clarify' else 'choice'
-    return await _owner_rpc(request, body.profile, f'{body.kind}.respond', session_id=body.session_id,
-                            prompt_id=body.request_id, execution_generation=body.execution_generation,
-                            **{field: body.choice})
+
+    async def answer(client):
+        view = await client.rpc('session.resume', session_id=body.session_id, omit_messages=True)
+        try:
+            return await client.rpc(f'{body.kind}.respond', session_id=view['session_id'],
+                                    prompt_id=body.request_id, execution_generation=body.execution_generation,
+                                    **{field: body.choice})
+        finally:
+            await client.rpc('session.detach', session_id=view['session_id'],
+                             subscription_id=view['subscription_id'])
+
+    return await _owner_rpc(request, body.profile, answer)
